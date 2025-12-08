@@ -1,0 +1,5 @@
+path: /data/dataset
+train: images/train
+val: images/val
+nc: 5
+names: ['fence_hole','fence_bent','fence_collapsed','chair','obstruction']
