@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -7,20 +8,25 @@ function App() {
     active_cameras: 0,
     uptime: 0
   });
+  const [alerts, setAlerts] = useState([]);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:8000/stats');
-        const data = await response.json();
-        setStats(data);
+        const statsRes = await fetch('http://localhost:8000/stats');
+        const statsData = await statsRes.json();
+        setStats(statsData);
+
+        const alertsRes = await fetch('http://localhost:8000/alerts');
+        const alertsData = await alertsRes.json();
+        setAlerts(alertsData);
       } catch (error) {
-        console.error("Failed to fetch stats:", error);
+        console.error("Failed to fetch data:", error);
       }
     };
 
-    fetchStats();
-    const interval = setInterval(fetchStats, 5000); // Poll every 5 seconds
+    fetchData();
+    const interval = setInterval(fetchData, 5000); // Poll every 5 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -29,6 +35,15 @@ function App() {
     const m = Math.floor((seconds % 3600) / 60);
     return `${h}h ${m}m`;
   };
+
+  // Prepare data for charts
+  const alertTypes = alerts.reduce((acc, alert) => {
+    acc[alert.event] = (acc[alert.event] || 0) + 1;
+    return acc;
+  }, {});
+
+  const pieData = Object.keys(alertTypes).map(key => ({ name: key, value: alertTypes[key] }));
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#FF0000'];
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
@@ -52,6 +67,13 @@ function App() {
               }`}
           >
             <span className="mr-3">🎥</span> Live Feed
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`w-full flex items-center p-3 rounded-lg transition-colors ${activeTab === 'analytics' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+          >
+            <span className="mr-3">📈</span> Analytics
           </button>
           <button
             onClick={() => setActiveTab('alerts')}
@@ -100,7 +122,7 @@ function App() {
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <p className="text-sm text-gray-500 mb-1">Total Alerts</p>
                 <h3 className="text-3xl font-bold text-gray-800">{stats.total_alerts}</h3>
-                <p className="text-xs text-red-500 mt-2">↑ 2 new today</p>
+                <p className="text-xs text-red-500 mt-2">Recorded events</p>
               </div>
               <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <p className="text-sm text-gray-500 mb-1">Active Cameras</p>
@@ -146,42 +168,81 @@ function App() {
             </div>
           )}
 
-          {/* Recent Activity Table (Visible on Dashboard) */}
-          {activeTab === 'dashboard' && (
+          {activeTab === 'analytics' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="text-lg font-semibold mb-4">Alert Distribution</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
+                <div className="h-64 flex items-center justify-center text-gray-400">
+                  [Bar Chart Placeholder - Needs more historical data]
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(activeTab === 'alerts' || activeTab === 'dashboard') && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-6 border-b border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-800">Recent Activity</h3>
+                <h3 className="text-lg font-semibold text-gray-800">Recent Alerts</h3>
               </div>
-              <table className="w-full text-left">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Camera</th>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
-                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  <tr>
-                    <td className="px-6 py-4 text-sm text-gray-600">10:42 AM</td>
-                    <td className="px-6 py-4 text-sm text-gray-800">Cam 01</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">Person Detected</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">Review</span></td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm text-gray-600">10:38 AM</td>
-                    <td className="px-6 py-4 text-sm text-gray-800">Cam 02</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">Vehicle Entry</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">Logged</span></td>
-                  </tr>
-                  <tr>
-                    <td className="px-6 py-4 text-sm text-gray-600">09:15 AM</td>
-                    <td className="px-6 py-4 text-sm text-gray-800">Cam 01</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">System Startup</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">Info</span></td>
-                  </tr>
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <tr>
+                      <th className="px-6 py-3">Time</th>
+                      <th className="px-6 py-3">Camera</th>
+                      <th className="px-6 py-3">Event</th>
+                      <th className="px-6 py-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {alerts.map((alert, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-600">{new Date(alert.timestamp).toLocaleTimeString()}</td>
+                        <td className="px-6 py-4 text-sm text-gray-800 font-medium">{alert.camera}</td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${alert.event.includes('Critical') || alert.event.includes('fire') || alert.event.includes('knife')
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-yellow-100 text-yellow-600'
+                            }`}>
+                            {alert.event}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">{alert.status}</td>
+                      </tr>
+                    ))}
+                    {alerts.length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-4 text-center text-gray-500">No alerts recorded yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

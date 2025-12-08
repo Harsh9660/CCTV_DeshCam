@@ -10,7 +10,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # --- AI Model Settings ---
 
 # Path to the YOLO model file.
-YOLO_MODEL_PATH: str = "yolov8n.pt"
+YOLO_MODEL_PATH: str = "yolov8s.pt"
 
 # Directory containing images of known faces for recognition.
 # Set to None to disable face recognition.
