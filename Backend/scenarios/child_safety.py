@@ -2,7 +2,12 @@
 Child Safety Scenario - Handles unsupervised children and restricted area entry
 """
 import logging
+import sys
+import os
 from typing import List, Dict, Any
+
+# Add parent directory to path to import models
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from models.person_classifier import PersonClassifier
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Components ---
 
-const StatCard = ({ title, value, subtext, icon: Icon, color, isDark }) => (
+const StatCard = ({ title, value, subtext, icon: Icon, color, isDark, isLoading }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -18,10 +18,14 @@ const StatCard = ({ title, value, subtext, icon: Icon, color, isDark }) => (
     <div className={`absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl -mr-10 -mt-10 transition-all ${isDark ? 'bg-violet-500/5 group-hover:bg-violet-500/10' : 'bg-violet-200/30 group-hover:bg-violet-200/50'
       }`}></div>
     <div className="flex items-center justify-between relative z-10">
-      <div>
+      <div className="flex-1">
         <p className={`text-sm font-medium mb-1 transition-colors ${isDark ? 'text-gray-400 group-hover:text-violet-300' : 'text-gray-600 group-hover:text-violet-600'
           }`}>{title}</p>
-        <h3 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>{value}</h3>
+        {isLoading ? (
+          <div className={`h-9 w-24 rounded animate-pulse ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}></div>
+        ) : (
+          <h3 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>{value}</h3>
+        )}
         <p className={`text-xs mt-2 font-medium ${color.text}`}>{subtext}</p>
       </div>
       <div className={`p-3 rounded-xl transition-colors border ${isDark
@@ -94,6 +98,11 @@ function App() {
   const [alerts, setAlerts] = useState([]);
   const [filteredAlerts, setFilteredAlerts] = useState([]);
 
+  // Loading and connection states
+  const [isLoading, setIsLoading] = useState(true);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [dataError, setDataError] = useState(null);
+
   // Filters
   const [selectedZone, setSelectedZone] = useState('all');
   const [selectedSeverity, setSelectedSeverity] = useState('all');
@@ -102,19 +111,67 @@ function App() {
   // WebSocket
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:8000/ws');
-    ws.onopen = () => toast.success('Connected to System', {
-      icon: '💜',
-      style: { background: '#0A0A0A', color: '#fff', border: '1px solid #7C3AED' }
-    });
+
+    ws.onopen = () => {
+      setWsConnected(true);
+      toast.success('Connected to System', {
+        icon: '💜',
+        style: { background: '#0A0A0A', color: '#fff', border: '1px solid #7C3AED' }
+      });
+    };
+
     ws.onmessage = (e) => {
-      const alert = JSON.parse(e.data);
-      setAlerts(prev => [alert, ...prev]);
-      if (alert.severity === 'critical') toast.error(alert.event, {
-        icon: '🚨',
+      try {
+        const data = JSON.parse(e.data);
+
+        // Handle different message types
+        if (data.type === 'connection' || data.type === 'keepalive' || data.type === 'pong') {
+          return; // Ignore system messages
+        }
+
+        // It's an alert
+        setAlerts(prev => [data, ...prev]);
+
+        if (data.severity === 'critical') {
+          toast.error(data.event, {
+            icon: '🚨',
+            style: { background: '#2B1111', color: '#FECACA', border: '1px solid #EF4444' }
+          });
+        } else if (data.severity === 'high') {
+          toast(data.event, {
+            icon: '⚠️',
+            style: { background: '#0A0A0A', color: '#FED7AA', border: '1px solid #F97316' }
+          });
+        }
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setWsConnected(false);
+    };
+
+    ws.onclose = () => {
+      setWsConnected(false);
+      toast.error('Disconnected from System', {
+        icon: '❌',
         style: { background: '#2B1111', color: '#FECACA', border: '1px solid #EF4444' }
       });
     };
-    return () => ws.close();
+
+    // Send periodic ping to keep connection alive
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send('ping');
+      }
+    }, 20000);
+
+    return () => {
+      clearInterval(pingInterval);
+      ws.close();
+    };
   }, []);
 
   // Fetch Data
@@ -125,12 +182,25 @@ function App() {
           fetch('http://localhost:8000/stats'),
           fetch('http://localhost:8000/alerts')
         ]);
-        setStats(await statsRes.json());
-        setAlerts(await alertsRes.json());
+
+        if (!statsRes.ok || !alertsRes.ok) {
+          throw new Error('Failed to fetch data');
+        }
+
+        const statsData = await statsRes.json();
+        const alertsData = await alertsRes.json();
+
+        setStats(statsData);
+        setAlerts(alertsData);
+        setDataError(null);
+        setIsLoading(false);
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching data:', err);
+        setDataError(err.message);
+        setIsLoading(false);
       }
     };
+
     fetchData();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
@@ -268,15 +338,28 @@ function App() {
               }`}>System Status: <span className="text-green-500 font-medium">Optimal</span></p>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Connection Status Indicator */}
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium ${wsConnected
+              ? isDarkTheme ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-green-50 text-green-700 border border-green-200'
+              : isDarkTheme ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+              <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+              <span>{wsConnected ? 'Connected' : 'Disconnected'}</span>
+            </div>
+
             <div className="relative hidden md:block group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-violet-400 transition-colors" size={18} />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isDarkTheme ? 'text-gray-500 group-focus-within:text-violet-400' : 'text-gray-400 group-focus-within:text-violet-600'}`} size={18} />
               <input
                 type="text"
                 placeholder="Search..."
-                className="pl-10 pr-4 py-2 bg-[#0A0A0A] rounded-xl border border-white/5 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 text-white w-64 transition-all outline-none placeholder-gray-600"
+                className={`pl-10 pr-4 py-2 rounded-xl border focus:ring-2 w-64 transition-all outline-none ${isDarkTheme
+                  ? 'bg-[#0A0A0A] border-white/5 focus:border-violet-500/50 focus:ring-violet-500/20 text-white placeholder-gray-600'
+                  : 'bg-white border-gray-300 focus:border-violet-500 focus:ring-violet-500/30 text-gray-900 placeholder-gray-400 shadow-sm'}`}
               />
             </div>
-            <button className="p-2 rounded-full bg-[#0A0A0A] text-gray-400 hover:text-white hover:bg-white/10 border border-white/5 transition-all relative hover:border-violet-500/30">
+            <button className={`p-2 rounded-full border transition-all relative ${isDarkTheme
+              ? 'bg-[#0A0A0A] text-gray-400 hover:text-white hover:bg-white/10 border-white/5 hover:border-violet-500/30'
+              : 'bg-white text-gray-600 hover:text-violet-600 hover:bg-violet-50 border-gray-300 hover:border-violet-400 shadow-sm'}`}>
               <Bell size={20} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-fuchsia-500 rounded-full shadow-[0_0_10px_rgba(217,70,239,0.8)] animate-pulse"></span>
             </button>
@@ -301,6 +384,7 @@ function App() {
                     icon={AlertTriangle}
                     color={{ text: 'text-fuchsia-400' }}
                     isDark={isDarkTheme}
+                    isLoading={isLoading}
                   />
                   <StatCard
                     title="Active Cameras"
@@ -309,6 +393,7 @@ function App() {
                     icon={Activity}
                     color={{ text: 'text-green-400' }}
                     isDark={isDarkTheme}
+                    isLoading={isLoading}
                   />
                   <StatCard
                     title="Staff Present"
@@ -317,14 +402,16 @@ function App() {
                     icon={Users}
                     color={{ text: 'text-violet-400' }}
                     isDark={isDarkTheme}
+                    isLoading={isLoading}
                   />
                   <StatCard
                     title="System Uptime"
-                    value="24h 12m"
+                    value={`${Math.floor(stats.uptime / 3600)}h ${Math.floor((stats.uptime % 3600) / 60)}m`}
                     subtext="Since last maintenance"
                     icon={Settings}
                     color={{ text: 'text-blue-400' }}
                     isDark={isDarkTheme}
+                    isLoading={isLoading}
                   />
                 </div>
 
@@ -333,11 +420,11 @@ function App() {
                   {/* Live Feed Preview */}
                   <div className="lg:col-span-2 space-y-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-white flex items-center">
+                      <h3 className={`text-lg font-bold flex items-center ${isDarkTheme ? 'text-white' : 'text-gray-900'}`}>
                         <span className="w-1 h-6 bg-violet-500 rounded-full mr-3 shadow-[0_0_10px_rgba(139,92,246,0.8)]"></span>
                         Live Monitoring
                       </h3>
-                      <button onClick={() => setActiveTab('live')} className="text-sm text-violet-400 hover:text-violet-300 font-medium transition-colors hover:underline decoration-violet-500/30 underline-offset-4">View All</button>
+                      <button onClick={() => setActiveTab('live')} className={`text-sm font-medium transition-colors hover:underline decoration-violet-500/30 underline-offset-4 ${isDarkTheme ? 'text-violet-400 hover:text-violet-300' : 'text-violet-600 hover:text-violet-700'}`}>View All</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <LiveFeedCard camera="Cam 01" status="live" zone="Outdoor Play" isDark={isDarkTheme} />
@@ -346,33 +433,35 @@ function App() {
                   </div>
 
                   {/* Recent Alerts List */}
-                  <div className="bg-[#0A0A0A] rounded-2xl p-6 shadow-lg border border-white/5 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center relative z-10">
+                  <div className={`rounded-2xl p-6 shadow-lg border relative overflow-hidden ${isDarkTheme ? 'bg-[#0A0A0A] border-white/5' : 'bg-white border-gray-200'}`}>
+                    {isDarkTheme && <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>}
+                    <h3 className={`text-lg font-bold mb-4 flex items-center relative z-10 ${isDarkTheme ? 'text-white' : 'text-gray-900'}`}>
                       <span className="w-1 h-6 bg-fuchsia-500 rounded-full mr-3 shadow-[0_0_10px_rgba(217,70,239,0.8)]"></span>
                       Recent Alerts
                     </h3>
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar relative z-10">
                       {filteredAlerts.slice(0, 5).map((alert, idx) => (
-                        <div key={idx} className="flex items-start p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group border border-transparent hover:border-white/10">
+                        <div key={idx} className={`flex items-start p-3 rounded-xl transition-colors cursor-pointer group border ${isDarkTheme
+                          ? 'bg-white/5 hover:bg-white/10 border-transparent hover:border-white/10'
+                          : 'bg-gray-50 hover:bg-gray-100 border-gray-200 hover:border-violet-300'}`}>
                           <div className={`p-2 rounded-lg mr-3 ${alert.severity === 'critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'}`}>
                             <AlertTriangle size={16} />
                           </div>
                           <div className="flex-1">
-                            <p className="text-sm font-semibold text-gray-200 group-hover:text-white transition-colors">{alert.event}</p>
-                            <p className="text-xs text-gray-500 mt-0.5 group-hover:text-gray-400">{alert.zone} • {new Date(alert.timestamp).toLocaleTimeString()}</p>
+                            <p className={`text-sm font-semibold transition-colors ${isDarkTheme ? 'text-gray-200 group-hover:text-white' : 'text-gray-800 group-hover:text-gray-900'}`}>{alert.event}</p>
+                            <p className={`text-xs mt-0.5 transition-colors ${isDarkTheme ? 'text-gray-500 group-hover:text-gray-400' : 'text-gray-600 group-hover:text-gray-700'}`}>{alert.zone} • {new Date(alert.timestamp).toLocaleTimeString()}</p>
                           </div>
                         </div>
                       ))}
-                      {filteredAlerts.length === 0 && <p className="text-center text-gray-600 py-4">No recent alerts</p>}
+                      {filteredAlerts.length === 0 && <p className={`text-center py-4 ${isDarkTheme ? 'text-gray-600' : 'text-gray-500'}`}>No recent alerts</p>}
                     </div>
                   </div>
                 </div>
 
                 {/* Charts Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className="bg-[#0A0A0A] p-6 rounded-2xl shadow-lg border border-white/5">
-                    <h3 className="text-lg font-bold text-white mb-6">Alert Distribution</h3>
+                  <div className={`p-6 rounded-2xl shadow-lg border ${isDarkTheme ? 'bg-[#0A0A0A] border-white/5' : 'bg-white border-gray-200'}`}>
+                    <h3 className={`text-lg font-bold mb-6 ${isDarkTheme ? 'text-white' : 'text-gray-900'}`}>Alert Distribution</h3>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -390,15 +479,17 @@ function App() {
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip contentStyle={{ backgroundColor: '#0A0A0A', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} />
+                          <Tooltip contentStyle={isDarkTheme
+                            ? { backgroundColor: '#0A0A0A', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }
+                            : { backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', color: '#111', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
                           <Legend />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
 
-                  <div className="bg-[#0A0A0A] p-6 rounded-2xl shadow-lg border border-white/5">
-                    <h3 className="text-lg font-bold text-white mb-6">Activity Trends</h3>
+                  <div className={`p-6 rounded-2xl shadow-lg border ${isDarkTheme ? 'bg-[#0A0A0A] border-white/5' : 'bg-white border-gray-200'}`}>
+                    <h3 className={`text-lg font-bold mb-6 ${isDarkTheme ? 'text-white' : 'text-gray-900'}`}>Activity Trends</h3>
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={[{ name: 'Mon', val: 12 }, { name: 'Tue', val: 19 }, { name: 'Wed', val: 15 }, { name: 'Thu', val: 22 }, { name: 'Fri', val: 30 }, { name: 'Sat', val: 10 }, { name: 'Sun', val: 8 }]}>
@@ -408,10 +499,12 @@ function App() {
                               <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
-                          <XAxis dataKey="name" stroke="#666" axisLine={false} tickLine={false} />
-                          <YAxis stroke="#666" axisLine={false} tickLine={false} />
-                          <Tooltip contentStyle={{ backgroundColor: '#0A0A0A', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} />
+                          <CartesianGrid strokeDasharray="3 3" stroke={isDarkTheme ? '#222' : '#e5e7eb'} vertical={false} />
+                          <XAxis dataKey="name" stroke={isDarkTheme ? '#666' : '#9ca3af'} axisLine={false} tickLine={false} />
+                          <YAxis stroke={isDarkTheme ? '#666' : '#9ca3af'} axisLine={false} tickLine={false} />
+                          <Tooltip contentStyle={isDarkTheme
+                            ? { backgroundColor: '#0A0A0A', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }
+                            : { backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', color: '#111', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
                           <Area type="monotone" dataKey="val" stroke="#8B5CF6" strokeWidth={3} fillOpacity={1} fill="url(#colorVal)" />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -440,17 +533,19 @@ function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="bg-[#0A0A0A] rounded-2xl shadow-lg border border-white/5 overflow-hidden"
+                className={`rounded-2xl shadow-lg border overflow-hidden ${isDarkTheme ? 'bg-[#0A0A0A] border-white/5' : 'bg-white border-gray-200'}`}
               >
-                <div className="p-6 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <h3 className="text-xl font-bold text-white">Alert History</h3>
+                <div className={`p-6 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 ${isDarkTheme ? 'border-white/5' : 'border-gray-200'}`}>
+                  <h3 className={`text-xl font-bold ${isDarkTheme ? 'text-white' : 'text-gray-900'}`}>Alert History</h3>
                   <div className="flex items-center space-x-3">
                     <div className="relative">
-                      <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                      <Filter className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDarkTheme ? 'text-gray-500' : 'text-gray-400'}`} size={16} />
                       <select
                         value={selectedSeverity}
                         onChange={(e) => setSelectedSeverity(e.target.value)}
-                        className="pl-9 pr-4 py-2 bg-black/50 border border-white/10 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 text-gray-300 outline-none"
+                        className={`pl-9 pr-4 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-violet-500 outline-none ${isDarkTheme
+                          ? 'bg-black/50 border-white/10 text-gray-300'
+                          : 'bg-white border-gray-300 text-gray-900'}`}
                       >
                         <option value="all">All Severities</option>
                         <option value="critical">Critical</option>
@@ -458,34 +553,36 @@ function App() {
                       </select>
                     </div>
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                      <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDarkTheme ? 'text-gray-500' : 'text-gray-400'}`} size={16} />
                       <input
                         type="text"
                         placeholder="Search alerts..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 pr-4 py-2 bg-black/50 border border-white/10 rounded-xl text-sm focus:ring-2 focus:ring-violet-500 text-gray-300 outline-none"
+                        className={`pl-9 pr-4 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-violet-500 outline-none ${isDarkTheme
+                          ? 'bg-black/50 border-white/10 text-gray-300 placeholder-gray-600'
+                          : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`}
                       />
                     </div>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-white/5">
+                    <thead className={isDarkTheme ? 'bg-white/5' : 'bg-gray-50'}>
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Time</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Zone</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Event</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Severity</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${isDarkTheme ? 'text-gray-400' : 'text-gray-600'}`}>Time</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${isDarkTheme ? 'text-gray-400' : 'text-gray-600'}`}>Zone</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${isDarkTheme ? 'text-gray-400' : 'text-gray-600'}`}>Event</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${isDarkTheme ? 'text-gray-400' : 'text-gray-600'}`}>Severity</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${isDarkTheme ? 'text-gray-400' : 'text-gray-600'}`}>Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
+                    <tbody className={`divide-y ${isDarkTheme ? 'divide-white/5' : 'divide-gray-200'}`}>
                       {filteredAlerts.map((alert, idx) => (
-                        <tr key={idx} className="hover:bg-white/5 transition-colors">
-                          <td className="px-6 py-4 text-sm text-gray-400">{new Date(alert.timestamp).toLocaleTimeString()}</td>
-                          <td className="px-6 py-4 text-sm font-medium text-white">{alert.zone}</td>
-                          <td className="px-6 py-4 text-sm text-gray-300">{alert.event}</td>
+                        <tr key={idx} className={`transition-colors ${isDarkTheme ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>
+                          <td className={`px-6 py-4 text-sm ${isDarkTheme ? 'text-gray-400' : 'text-gray-600'}`}>{new Date(alert.timestamp).toLocaleTimeString()}</td>
+                          <td className={`px-6 py-4 text-sm font-medium ${isDarkTheme ? 'text-white' : 'text-gray-900'}`}>{alert.zone}</td>
+                          <td className={`px-6 py-4 text-sm ${isDarkTheme ? 'text-gray-300' : 'text-gray-700'}`}>{alert.event}</td>
                           <td className="px-6 py-4">
                             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${alert.severity === 'critical' ? 'bg-red-500/20 text-red-400 border border-red-500/20' :
                               alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/20' :
@@ -494,7 +591,7 @@ function App() {
                               {alert.severity}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{alert.status}</td>
+                          <td className={`px-6 py-4 text-sm ${isDarkTheme ? 'text-gray-500' : 'text-gray-600'}`}>{alert.status}</td>
                         </tr>
                       ))}
                     </tbody>

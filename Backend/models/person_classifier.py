@@ -1,6 +1,7 @@
 """
 Person Classifier - Differentiates between staff, children, and unknown adults
 """
+import os
 import cv2
 import logging
 from typing import List, Dict, Any, Tuple
