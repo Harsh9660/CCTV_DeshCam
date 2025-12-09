@@ -6,41 +6,59 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Components ---
 
-const StatCard = ({ title, value, subtext, icon: Icon, color }) => (
+const StatCard = ({ title, value, subtext, icon: Icon, color, isDark }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="bg-[#0A0A0A] p-6 rounded-2xl shadow-lg border border-white/5 hover:border-violet-500/30 transition-all hover:shadow-[0_0_20px_rgba(139,92,246,0.1)] group relative overflow-hidden"
+    className={`p-6 rounded-2xl shadow-lg border transition-all group relative overflow-hidden ${isDark
+      ? 'bg-[#0A0A0A] border-white/5 hover:border-violet-500/30 hover:shadow-[0_0_20px_rgba(139,92,246,0.1)]'
+      : 'bg-white border-gray-200 hover:border-violet-400 hover:shadow-xl'
+      }`}
   >
-    <div className="absolute top-0 right-0 w-20 h-20 bg-violet-500/5 rounded-full blur-2xl -mr-10 -mt-10 transition-all group-hover:bg-violet-500/10"></div>
+    <div className={`absolute top-0 right-0 w-20 h-20 rounded-full blur-2xl -mr-10 -mt-10 transition-all ${isDark ? 'bg-violet-500/5 group-hover:bg-violet-500/10' : 'bg-violet-200/30 group-hover:bg-violet-200/50'
+      }`}></div>
     <div className="flex items-center justify-between relative z-10">
       <div>
-        <p className="text-sm font-medium text-gray-400 mb-1 group-hover:text-violet-300 transition-colors">{title}</p>
-        <h3 className="text-3xl font-bold text-white tracking-tight">{value}</h3>
+        <p className={`text-sm font-medium mb-1 transition-colors ${isDark ? 'text-gray-400 group-hover:text-violet-300' : 'text-gray-600 group-hover:text-violet-600'
+          }`}>{title}</p>
+        <h3 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>{value}</h3>
         <p className={`text-xs mt-2 font-medium ${color.text}`}>{subtext}</p>
       </div>
-      <div className={`p-3 rounded-xl bg-white/5 group-hover:bg-violet-500/20 transition-colors border border-white/5 group-hover:border-violet-500/30`}>
-        <Icon className="text-gray-300 group-hover:text-violet-400 transition-colors" size={24} />
+      <div className={`p-3 rounded-xl transition-colors border ${isDark
+        ? 'bg-white/5 group-hover:bg-violet-500/20 border-white/5 group-hover:border-violet-500/30'
+        : 'bg-violet-50 group-hover:bg-violet-100 border-violet-200 group-hover:border-violet-400'
+        }`}>
+        <Icon className={`transition-colors ${isDark ? 'text-gray-300 group-hover:text-violet-400' : 'text-violet-600 group-hover:text-violet-700'
+          }`} size={24} />
       </div>
     </div>
   </motion.div>
 );
 
-const LiveFeedCard = ({ camera, status, zone }) => (
+const LiveFeedCard = ({ camera, status, zone, isDark }) => (
   <motion.div
     layout
-    className="bg-[#0A0A0A] rounded-2xl overflow-hidden aspect-video relative group shadow-2xl border border-white/10 hover:border-violet-500/50 transition-all"
+    className={`rounded-2xl overflow-hidden aspect-video relative group shadow-2xl border transition-all ${isDark
+      ? 'bg-[#0A0A0A] border-white/10 hover:border-violet-500/50'
+      : 'bg-gray-100 border-gray-300 hover:border-violet-400'
+      }`}
   >
-    <div className={`absolute top-4 left-4 px-3 py-1 rounded-full z-10 flex items-center backdrop-blur-md ${status === 'live' ? 'bg-red-500/80 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-gray-800/80 text-gray-400'}`}>
+    <div className={`absolute top-4 left-4 px-3 py-1 rounded-full z-10 flex items-center backdrop-blur-md ${status === 'live' ? 'bg-red-500/80 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]' : isDark ? 'bg-gray-800/80 text-gray-400' : 'bg-gray-200/80 text-gray-600'}`}>
       <span className={`w-2 h-2 rounded-full mr-2 ${status === 'live' ? 'bg-white animate-pulse' : 'bg-gray-500'}`}></span>
       <span className="text-xs font-bold uppercase tracking-wider">{status === 'live' ? 'LIVE' : 'OFFLINE'}</span>
     </div>
     <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end z-10">
-      <div className="bg-black/60 backdrop-blur-md px-3 py-2 rounded-lg border border-white/10">
-        <p className="text-white text-sm font-medium flex items-center"><MapPin size={14} className="mr-1 text-violet-400" /> {zone}</p>
-        <p className="text-gray-400 text-xs">{camera}</p>
+      <div className={`backdrop-blur-md px-3 py-2 rounded-lg border ${isDark ? 'bg-black/60 border-white/10' : 'bg-white/60 border-gray-300'
+        }`}>
+        <p className={`text-sm font-medium flex items-center ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <MapPin size={14} className="mr-1 text-violet-400" /> {zone}
+        </p>
+        <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{camera}</p>
       </div>
-      <button className="p-2 bg-white/10 hover:bg-violet-600 rounded-lg backdrop-blur-md text-white transition-colors border border-white/10">
+      <button className={`p-2 rounded-lg backdrop-blur-md transition-colors border ${isDark
+        ? 'bg-white/10 hover:bg-violet-600 text-white border-white/10'
+        : 'bg-white/60 hover:bg-violet-500 text-gray-700 hover:text-white border-gray-300'
+        }`}>
         <Maximize size={18} />
       </button>
     </div>
@@ -52,14 +70,14 @@ const LiveFeedCard = ({ camera, status, zone }) => (
         onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
       />
     ) : (
-      <div className="w-full h-full flex items-center justify-center bg-[#050505]">
+      <div className={`w-full h-full flex items-center justify-center ${isDark ? 'bg-[#050505]' : 'bg-gray-200'}`}>
         <div className="text-center">
-          <Activity className="mx-auto text-gray-800 mb-2" size={32} />
-          <p className="text-gray-700 text-sm">Signal Lost</p>
+          <Activity className={`mx-auto mb-2 ${isDark ? 'text-gray-800' : 'text-gray-400'}`} size={32} />
+          <p className={`text-sm ${isDark ? 'text-gray-700' : 'text-gray-500'}`}>Signal Lost</p>
         </div>
       </div>
     )}
-    <div className="hidden w-full h-full items-center justify-center text-gray-500 bg-[#050505] absolute top-0 left-0">
+    <div className={`hidden w-full h-full items-center justify-center absolute top-0 left-0 ${isDark ? 'bg-[#050505] text-gray-500' : 'bg-gray-200 text-gray-600'}`}>
       <div className="text-center">
         <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
         <p className="text-xs text-violet-400">Connecting...</p>
@@ -71,6 +89,7 @@ const LiveFeedCard = ({ camera, status, zone }) => (
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
   const [stats, setStats] = useState({ total_alerts: 0, active_cameras: 0, uptime: 0 });
   const [alerts, setAlerts] = useState([]);
   const [filteredAlerts, setFilteredAlerts] = useState([]);
@@ -135,17 +154,23 @@ function App() {
   const COLORS = ['#8B5CF6', '#D946EF', '#F43F5E', '#EC4899', '#A78BFA'];
 
   return (
-    <div className="flex h-screen bg-black font-sans text-gray-100 selection:bg-violet-500/30 selection:text-violet-200 overflow-hidden">
+    <div className={`flex h-screen font-sans overflow-hidden transition-colors duration-300 ${isDarkTheme
+      ? 'bg-black text-gray-100 selection:bg-violet-500/30 selection:text-violet-200'
+      : 'bg-gray-50 text-gray-900 selection:bg-violet-200 selection:text-violet-900'
+      }`}>
       <Toaster position="top-right" />
 
       {/* Sidebar */}
       <motion.aside
         initial={{ width: 280 }}
         animate={{ width: sidebarOpen ? 280 : 80 }}
-        className="bg-[#050505] border-r border-white/5 flex flex-col z-20 shadow-2xl relative"
+        className={`border-r flex flex-col z-20 shadow-2xl relative transition-colors ${isDarkTheme
+          ? 'bg-[#050505] border-white/5'
+          : 'bg-white border-gray-200'
+          }`}
       >
         {/* Glow effect behind sidebar */}
-        <div className="absolute top-0 left-0 w-full h-full bg-violet-500/5 blur-3xl -z-10 pointer-events-none"></div>
+        {isDarkTheme && <div className="absolute top-0 left-0 w-full h-full bg-violet-500/5 blur-3xl -z-10 pointer-events-none"></div>}
 
         <div className="p-6 flex items-center justify-between">
           {sidebarOpen ? (
@@ -180,8 +205,8 @@ function App() {
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center p-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${activeTab === item.id
-                  ? 'text-white bg-white/5 shadow-[0_0_20px_rgba(139,92,246,0.1)] border border-white/5'
-                  : 'text-gray-500 hover:text-gray-200 hover:bg-white/5 border border-transparent'
+                ? 'text-white bg-white/5 shadow-[0_0_20px_rgba(139,92,246,0.1)] border border-white/5'
+                : 'text-gray-500 hover:text-gray-200 hover:bg-white/5 border border-transparent'
                 }`}
             >
               {activeTab === item.id && (
@@ -193,7 +218,7 @@ function App() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-white/5">
+        <div className="p-4 border-t border-white/5 space-y-3">
           <div className="bg-[#0A0A0A] rounded-xl p-4 border border-white/5 hover:border-violet-500/20 transition-colors group">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-500 to-fuchsia-500 border border-white/20 shadow-lg group-hover:shadow-violet-500/20 transition-all"></div>
@@ -205,22 +230,42 @@ function App() {
               )}
             </div>
           </div>
+
+          {/* Theme Toggle Button */}
+          <button
+            onClick={() => setIsDarkTheme(!isDarkTheme)}
+            className={`w-full flex items-center justify-center p-3 rounded-xl transition-all duration-300 border ${isDarkTheme
+              ? 'bg-white/5 hover:bg-white/10 border-white/10 text-violet-400'
+              : 'bg-violet-600 hover:bg-violet-700 border-violet-700 text-white shadow-lg'
+              }`}
+          >
+            {isDarkTheme ? <Sun size={20} /> : <Moon size={20} />}
+            {sidebarOpen && <span className="ml-3 text-sm font-medium">{isDarkTheme ? 'Light Mode' : 'Dark Mode'}</span>}
+          </button>
         </div>
       </motion.aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative bg-black">
+      <main className={`flex-1 overflow-y-auto relative transition-colors ${isDarkTheme ? 'bg-black' : 'bg-gray-50'
+        }`}>
         {/* Ambient Background Glows */}
-        <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-violet-900/10 rounded-full blur-[120px]"></div>
-          <div className="absolute bottom-[-10%] left-[10%] w-[400px] h-[400px] bg-fuchsia-900/10 rounded-full blur-[100px]"></div>
-        </div>
+        {isDarkTheme && (
+          <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+            <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-violet-900/10 rounded-full blur-[120px]"></div>
+            <div className="absolute bottom-[-10%] left-[10%] w-[400px] h-[400px] bg-fuchsia-900/10 rounded-full blur-[100px]"></div>
+          </div>
+        )}
 
         {/* Top Bar */}
-        <header className="sticky top-0 bg-black/80 backdrop-blur-xl border-b border-white/5 px-8 py-4 flex justify-between items-center z-10">
+        <header className={`sticky top-0 backdrop-blur-xl border-b px-8 py-4 flex justify-between items-center z-10 transition-colors ${isDarkTheme
+          ? 'bg-black/80 border-white/5'
+          : 'bg-white/80 border-gray-200'
+          }`}>
           <div>
-            <h2 className="text-2xl font-bold text-white capitalize tracking-tight">{activeTab}</h2>
-            <p className="text-sm text-gray-500 mt-0.5">System Status: <span className="text-green-400 font-medium">Optimal</span></p>
+            <h2 className={`text-2xl font-bold capitalize tracking-tight ${isDarkTheme ? 'text-white' : 'text-gray-900'
+              }`}>{activeTab}</h2>
+            <p className={`text-sm mt-0.5 ${isDarkTheme ? 'text-gray-500' : 'text-gray-600'
+              }`}>System Status: <span className="text-green-500 font-medium">Optimal</span></p>
           </div>
           <div className="flex items-center space-x-4">
             <div className="relative hidden md:block group">
@@ -255,6 +300,7 @@ function App() {
                     subtext="+12% from yesterday"
                     icon={AlertTriangle}
                     color={{ text: 'text-fuchsia-400' }}
+                    isDark={isDarkTheme}
                   />
                   <StatCard
                     title="Active Cameras"
@@ -262,6 +308,7 @@ function App() {
                     subtext="All systems operational"
                     icon={Activity}
                     color={{ text: 'text-green-400' }}
+                    isDark={isDarkTheme}
                   />
                   <StatCard
                     title="Staff Present"
@@ -269,6 +316,7 @@ function App() {
                     subtext="Ratio 1:5 (Optimal)"
                     icon={Users}
                     color={{ text: 'text-violet-400' }}
+                    isDark={isDarkTheme}
                   />
                   <StatCard
                     title="System Uptime"
@@ -276,6 +324,7 @@ function App() {
                     subtext="Since last maintenance"
                     icon={Settings}
                     color={{ text: 'text-blue-400' }}
+                    isDark={isDarkTheme}
                   />
                 </div>
 
@@ -291,8 +340,8 @@ function App() {
                       <button onClick={() => setActiveTab('live')} className="text-sm text-violet-400 hover:text-violet-300 font-medium transition-colors hover:underline decoration-violet-500/30 underline-offset-4">View All</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <LiveFeedCard camera="Cam 01" status="live" zone="Outdoor Play" />
-                      <LiveFeedCard camera="Cam 02" status="offline" zone="Classroom A" />
+                      <LiveFeedCard camera="Cam 01" status="live" zone="Outdoor Play" isDark={isDarkTheme} />
+                      <LiveFeedCard camera="Cam 02" status="offline" zone="Classroom A" isDark={isDarkTheme} />
                     </div>
                   </div>
 
@@ -379,10 +428,10 @@ function App() {
                 exit={{ opacity: 0 }}
                 className="grid grid-cols-1 lg:grid-cols-2 gap-8"
               >
-                <LiveFeedCard camera="Cam 01" status="live" zone="Outdoor Play" />
-                <LiveFeedCard camera="Cam 02" status="offline" zone="Classroom A" />
-                <LiveFeedCard camera="Cam 03" status="offline" zone="Staff Room" />
-                <LiveFeedCard camera="Cam 04" status="offline" zone="Hallway" />
+                <LiveFeedCard camera="Cam 01" status="live" zone="Outdoor Play" isDark={isDarkTheme} />
+                <LiveFeedCard camera="Cam 02" status="offline" zone="Classroom A" isDark={isDarkTheme} />
+                <LiveFeedCard camera="Cam 03" status="offline" zone="Staff Room" isDark={isDarkTheme} />
+                <LiveFeedCard camera="Cam 04" status="offline" zone="Hallway" isDark={isDarkTheme} />
               </motion.div>
             )}
 
@@ -439,8 +488,8 @@ function App() {
                           <td className="px-6 py-4 text-sm text-gray-300">{alert.event}</td>
                           <td className="px-6 py-4">
                             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${alert.severity === 'critical' ? 'bg-red-500/20 text-red-400 border border-red-500/20' :
-                                alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/20' :
-                                  'bg-violet-500/20 text-violet-400 border border-violet-500/20'
+                              alert.severity === 'high' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/20' :
+                                'bg-violet-500/20 text-violet-400 border border-violet-500/20'
                               }`}>
                               {alert.severity}
                             </span>
